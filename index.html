@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Switch Puzzle</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+        }
+        
+        h1 {
+            margin-bottom: 10px;
+            text-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            color: #e94560;
+        }
+        
+        .game-container {
+            position: relative;
+            margin: 20px 0;
+        }
+        
+        canvas {
+            border: 3px solid #0f3460;
+            border-radius: 10px;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            background-color: #0f3460;
+        }
+        
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            width: 400px;
+            margin-bottom: 15px;
+            background-color: rgba(15, 52, 96, 0.7);
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .controls {
+            margin-top: 15px;
+            display: flex;
+            gap: 10px;
+        }
+        
+        button {
+            background-color: #e94560;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        }
+        
+        button:hover {
+            background-color: #ff6b81;
+            transform: translateY(-2px);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            background-color: rgba(15, 52, 96, 0.7);
+            padding: 15px;
+            border-radius: 8px;
+            max-width: 400px;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .level-complete {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(15, 52, 96, 0.95);
+            padding: 20px 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 10;
+        }
+        
+        .game-complete {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(15, 52, 96, 0.95);
+            padding: 30px 40px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 20;
+        }
+        
+        .game-complete h2 {
+            color: #ffd700;
+            font-size: 28px;
+            margin-bottom: 15px;
+        }
+        
+        .stats {
+            margin: 15px 0;
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Color Switch Puzzle</h1>
+    
+    <div class="info-panel">
+        <div>レベル: <span id="level">1</span></div>
+        <div>移動回数: <span id="moves">0</span></div>
+        <div>目標: <span id="target">赤色のゴールに到達</span></div>
+    </div>
+    
+    <div class="game-container">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <div id="levelComplete" class="level-complete">
+            <h2>レベルクリア!</h2>
+            <p>おめでとうございます！レベルをクリアしました。</p>
+            <button id="nextLevel">次のレベル</button>
+        </div>
+        <div id="gameComplete" class="game-complete">
+            <h2>ゲームクリア!</h2>
+            <p>おめでとうございます！すべてのレベルをクリアしました！</p>
+            <div class="stats">
+                <p>総移動回数: <span id="totalMoves">0</span></p>
+                <p>クリアタイム: <span id="clearTime">0</span>秒</p>
+            </div>
+            <button id="playAgain">もう一度遊ぶ</button>
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button id="restart">リスタート</button>
+    </div>
+    
+    <div class="instructions">
+        <p><strong>遊び方:</strong> プレイヤー（白い四角）を矢印キーで動かし、同じ色のゴール（大きい四角）に到達させましょう。色のついたブロックは同じ色のときにのみ通過できます。</p>
+    </div>
+
+    <script>
+        // ゲームの状態を管理する変数
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const levelElement = document.getElementById('level');
+        const movesElement = document.getElementById('moves');
+        const targetElement = document.getElementById('target');
+        const restartButton = document.getElementById('restart');
+        const nextLevelButton = document.getElementById('nextLevel');
+        const levelCompleteElement = document.getElementById('levelComplete');
+        const gameCompleteElement = document.getElementById('gameComplete');
+        const playAgainButton = document.getElementById('playAgain');
+        const totalMovesElement = document.getElementById('totalMoves');
+        const clearTimeElement = document.getElementById('clearTime');
+        
+        let currentLevel = 1;
+        let moves = 0;
+        let totalMoves = 0;
+        let startTime = 0;
+        let player = { x: 0, y: 0, color: 'white', size: 20 };
+        let goal = { x: 0, y: 0, color: 'red', size: 30 };
+        let blocks = [];
+        let colorSwitches = [];
+        let gameActive = true;
+        
+        // 色の定義
+        const colors = ['red', 'blue', 'green', 'yellow', 'purple'];
+        
+        // 位置が有効かチェックする関数（他のオブジェクトと重ならないか）
+        function isValidPosition(x, y, objects, minDistance = 25) {
+            for (const obj of objects) {
+                let objX, objY, objWidth, objHeight;
+                
+                if (obj.width) { // ブロックの場合
+                    objX = obj.x;
+                    objY = obj.y;
+                    objWidth = obj.width;
+                    objHeight = obj.height;
+                } else { // カラースイッチの場合
+                    objX = obj.x;
+                    objY = obj.y;
+                    objWidth = 30; // カラースイッチの直径
+                    objHeight = 30;
+                }
+                
+                // 矩形同士の衝突検出
+                if (x < objX + objWidth + minDistance &&
+                    x + minDistance > objX &&
+                    y < objY + objHeight + minDistance &&
+                    y + minDistance > objY) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        
+        // ステージ自動生成関数
+        function generateLevel(levelNum) {
+            // 難易度調整
+            const blockCount = Math.min(2 + levelNum, 8);
+            const colorCount = Math.min(2 + Math.floor(levelNum / 2), 5);
+            const switchCount = Math.min(2 + levelNum, 6);
+            
+            // 使用する色を選択
+            const availableColors = [...colors].sort(() => Math.random() - 0.5).slice(0, colorCount);
+            const goalColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+            
+            // プレイヤーとゴールの位置を設定（対角線上に配置）
+            const playerPos = { x: 50, y: 50 };
+            const goalPos = { x: 350, y: 350 };
+            
+            // ブロック生成
+            const blocks = [];
+            const allObjects = [...blocks]; // すべてのオブジェクトを追跡
+            
+            // プレイヤーとゴールの周辺にブロックを配置しないための安全ゾーン
+            const safeZones = [
+                { x: playerPos.x - 40, y: playerPos.y - 40, width: 80, height: 80 },
+                { x: goalPos.x - 40, y: goalPos.y - 40, width: 80, height: 80 }
+            ];
+            
+            for (let i = 0; i < blockCount; i++) {
+                const isHorizontal = Math.random() > 0.5;
+                const blockColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+                
+                let validPosition = false;
+                let attempts = 0;
+                let block;
+                
+                while (!validPosition && attempts < 50) {
+                    if (isHorizontal) {
+                        // 水平ブロック
+                        const y = 100 + Math.random() * 200;
+                        const width = 80 + Math.random() * 120;
+                        const x = Math.random() * (400 - width);
+                        block = { x, y, width, height: 20, color: blockColor };
+                    } else {
+                        // 垂直ブロック
+                        const x = 100 + Math.random() * 200;
+                        const height = 80 + Math.random() * 120;
+                        const y = Math.random() * (400 - height);
+                        block = { x, y, width: 20, height, color: blockColor };
+                    }
+                    
+                    // 安全ゾーンと重ならないかチェック
+                    let inSafeZone = false;
+                    for (const zone of safeZones) {
+                        if (block.x < zone.x + zone.width &&
+                            block.x + block.width > zone.x &&
+                            block.y < zone.y + zone.height &&
+                            block.y + block.height > zone.y) {
+                            inSafeZone = true;
+                            break;
+                        }
+                    }
+                    
+                    // 他のブロックと重ならないかチェック
+                    if (!inSafeZone && isValidPosition(block.x, block.y, allObjects, 20)) {
+                        validPosition = true;
+                        blocks.push(block);
+                        allObjects.push(block);
+                    }
+                    
+                    attempts++;
+                }
+            }
+            
+            // カラースイッチ生成
+            const colorSwitches = [];
+            
+            // まず、利用可能な各色に対して少なくとも1つのスイッチを生成
+            for (const color of availableColors) {
+                let validPosition = false;
+                let attempts = 0;
+                
+                while (!validPosition && attempts < 50) {
+                    const x = 50 + Math.random() * 300;
+                    const y = 50 + Math.random() * 300;
+                    
+                    // 安全ゾーンと重ならないかチェック
+                    let inSafeZone = false;
+                    for (const zone of safeZones) {
+                        if (x >= zone.x && x <= zone.x + zone.width &&
+                            y >= zone.y && y <= zone.y + zone.height) {
+                            inSafeZone = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!inSafeZone && isValidPosition(x, y, allObjects, 25)) {
+                        colorSwitches.push({ x, y, color });
+                        allObjects.push({ x, y, width: 30, height: 30 }); // 仮想的な矩形として追加
+                        validPosition = true;
+                    }
+                    
+                    attempts++;
+                }
+            }
+            
+            // 残りのスイッチを生成
+            const remainingSwitches = switchCount - availableColors.length;
+            for (let i = 0; i < remainingSwitches; i++) {
+                let validPosition = false;
+                let attempts = 0;
+                
+                while (!validPosition && attempts < 50) {
+                    const switchColor = availableColors[Math.floor(Math.random() * availableColors.length)];
+                    const x = 50 + Math.random() * 300;
+                    const y = 50 + Math.random() * 300;
+                    
+                    // 安全ゾーンと重ならないかチェック
+                    let inSafeZone = false;
+                    for (const zone of safeZones) {
+                        if (x >= zone.x && x <= zone.x + zone.width &&
+                            y >= zone.y && y <= zone.y + zone.height) {
+                            inSafeZone = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!inSafeZone && isValidPosition(x, y, allObjects, 25)) {
+                        colorSwitches.push({ x, y, color: switchColor });
+                        allObjects.push({ x, y, width: 30, height: 30 }); // 仮想的な矩形として追加
+                        validPosition = true;
+                    }
+                    
+                    attempts++;
+                }
+            }
+            
+            return {
+                player: playerPos,
+                goal: { x: goalPos.x, y: goalPos.y, color: goalColor },
+                blocks,
+                colorSwitches,
+                targetText: `${goalColor}色のゴールに到達`
+            };
+        }
+        
+        // ゲームの初期化
+        function initGame() {
+            moves = 0;
+            movesElement.textContent = moves;
+            levelElement.textContent = currentLevel;
+            
+            // 自動生成されたレベルを取得
+            const level = generateLevel(currentLevel);
+            player.x = level.player.x;
+            player.y = level.player.y;
+            player.color = 'white';
+            
+            goal.x = level.goal.x;
+            goal.y = level.goal.y;
+            goal.color = level.goal.color;
+            
+            blocks = level.blocks.map(block => ({ ...block }));
+            colorSwitches = level.colorSwitches.map(switchObj => ({ ...switchObj }));
+            
+            targetElement.textContent = level.targetText;
+            
+            gameActive = true;
+            levelCompleteElement.style.display = 'none';
+            gameCompleteElement.style.display = 'none';
+            
+            // ゲーム開始時間を記録
+            if (currentLevel === 1) {
+                startTime = Date.now();
+                totalMoves = 0;
+            }
+            
+            drawGame();
+        }
+        
+        // ゲームの描画
+        function drawGame() {
+            // 背景の描画
+            ctx.fillStyle = '#0f3460';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // ブロックの描画
+            blocks.forEach(block => {
+                ctx.fillStyle = block.color;
+                ctx.fillRect(block.x, block.y, block.width, block.height);
+                
+                // ブロックの枠線
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(block.x, block.y, block.width, block.height);
+            });
+            
+            // カラースイッチの描画
+            colorSwitches.forEach(switchObj => {
+                ctx.fillStyle = switchObj.color;
+                ctx.beginPath();
+                ctx.arc(switchObj.x, switchObj.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // スイッチの枠線
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            });
+            
+            // ゴールの描画
+            ctx.fillStyle = goal.color;
+            ctx.fillRect(goal.x - goal.size/2, goal.y - goal.size/2, goal.size, goal.size);
+            
+            // ゴールの枠線
+            ctx.strokeStyle = 'white';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(goal.x - goal.size/2, goal.y - goal.size/2, goal.size, goal.size);
+            
+            // プレイヤーの描画
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+            
+            // プレイヤーの枠線
+            ctx.strokeStyle = 'black';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(player.x - player.size/2, player.y - player.size/2, player.size, player.size);
+        }
+        
+        // プレイヤーの移動
+        function movePlayer(dx, dy) {
+            if (!gameActive) return;
+            
+            const newX = player.x + dx;
+            const newY = player.y + dy;
+            
+            // キャンバスの境界チェック
+            if (newX < player.size/2 || newX > canvas.width - player.size/2 ||
+                newY < player.size/2 || newY > canvas.height - player.size/2) {
+                return;
+            }
+            
+            // ブロックとの衝突チェック
+            let canMove = true;
+            blocks.forEach(block => {
+                if (player.color !== block.color && 
+                    newX + player.size/2 > block.x && 
+                    newX - player.size/2 < block.x + block.width &&
+                    newY + player.size/2 > block.y && 
+                    newY - player.size/2 < block.y + block.height) {
+                    canMove = false;
+                }
+            });
+            
+            if (canMove) {
+                player.x = newX;
+                player.y = newY;
+                moves++;
+                movesElement.textContent = moves;
+                
+                // カラースイッチのチェック
+                colorSwitches.forEach(switchObj => {
+                    const dx = player.x - switchObj.x;
+                    const dy = player.y - switchObj.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 25) { // プレイヤーとスイッチが接触
+                        player.color = switchObj.color;
+                    }
+                });
+                
+                // ゴールのチェック
+                const dxToGoal = player.x - goal.x;
+                const dyToGoal = player.y - goal.y;
+                const distanceToGoal = Math.sqrt(dxToGoal * dxToGoal + dyToGoal * dyToGoal);
+                
+                if (distanceToGoal < 30 && player.color === goal.color) {
+                    gameActive = false;
+                    totalMoves += moves;
+                    
+                    if (currentLevel < 10) { // 最大10レベルまで
+                        levelCompleteElement.style.display = 'block';
+                    } else {
+                        // 最終レベルクリア
+                        const clearTime = Math.floor((Date.now() - startTime) / 1000);
+                        clearTimeElement.textContent = clearTime;
+                        totalMovesElement.textContent = totalMoves;
+                        gameCompleteElement.style.display = 'block';
+                    }
+                }
+                
+                drawGame();
+            }
+        }
+        
+        // キーボードイベントの処理
+        document.addEventListener('keydown', (e) => {
+            switch(e.key) {
+                case 'ArrowUp':
+                    movePlayer(0, -10);
+                    break;
+                case 'ArrowDown':
+                    movePlayer(0, 10);
+                    break;
+                case 'ArrowLeft':
+                    movePlayer(-10, 0);
+                    break;
+                case 'ArrowRight':
+                    movePlayer(10, 0);
+                    break;
+            }
+        });
+        
+        // ボタンイベントの処理
+        restartButton.addEventListener('click', initGame);
+        
+        nextLevelButton.addEventListener('click', () => {
+            if (currentLevel < 10) { // 最大10レベルまで
+                currentLevel++;
+                initGame();
+            }
+        });
+        
+        playAgainButton.addEventListener('click', () => {
+            currentLevel = 1;
+            initGame();
+        });
+        
+        // ゲームの開始
+        initGame();
+    </script>
+</body>
+</html>
