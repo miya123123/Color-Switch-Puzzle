@@ -25,5 +25,6 @@ MIT
 # 関連URL
 - [DeepSeek](https://chat.deepseek.com/)
 - [deepseek-ai/DeepSeek-V3.2-Exp](https://github.com/deepseek-ai/DeepSeek-V3.2-Exp)
+- [本ゲームのデモ | Color Switch Puzzle](https://miya123123.github.io/Color-Switch-Puzzle/)
 - [DeepSeek-V3-0324を試す | miya](https://x.com/miya00907380/status/1908643560712544489)
 - [Codexを使用し、マルチトラック同時再生プレーヤーを開発 | miya](https://x.com/miya00907380/status/1965535698624160252)
